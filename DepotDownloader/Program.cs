@@ -275,12 +275,26 @@ namespace DepotDownloader
                     return 1;
                 }
 
-                ContentDownloader.Config.DownloadAllLanguages = HasParameter(args, "-all-languages");
+                ContentDownloader.Config.DownloadLanguagesOnly = HasParameter(args, "-languages-only");
+                ContentDownloader.Config.LanguagesInstallDirectory = GetParameter<string>(args, "-languages-dir");
+                ContentDownloader.Config.DownloadAllLanguages = ContentDownloader.Config.DownloadLanguagesOnly || HasParameter(args, "-all-languages");
                 var language = GetParameter<string>(args, "-language");
+
+                if (ContentDownloader.Config.DownloadLanguagesOnly && string.IsNullOrEmpty(ContentDownloader.Config.LanguagesInstallDirectory))
+                {
+                    Console.WriteLine("Error: -languages-dir must be specified when -languages-only is set.");
+                    return 1;
+                }
+
+                if (!string.IsNullOrEmpty(ContentDownloader.Config.InstallDirectory) && ContentDownloader.Config.DownloadLanguagesOnly)
+                {
+                    Console.WriteLine("Error: Cannot specify -dir when -languages-only is specified.");
+                    return 1;
+                }
 
                 if (ContentDownloader.Config.DownloadAllLanguages && !string.IsNullOrEmpty(language))
                 {
-                    Console.WriteLine("Error: Cannot specify -language when -all-languages is specified.");
+                    Console.WriteLine("Error: Cannot specify -language when -all-languages or -languages-only is specified.");
                     return 1;
                 }
 
@@ -507,6 +521,8 @@ namespace DepotDownloader
             Console.WriteLine("  -osarch <arch>           - the architecture for which to download the game (32 or 64, default: the host's architecture)");
             Console.WriteLine("  -all-languages           - download all language-specific depots when -app is used.");
             Console.WriteLine("  -language <lang>         - the language for which to download the game (default: english)");
+            Console.WriteLine("  -languages-only          - download only language-specific depots.");
+            Console.WriteLine("  -languages-dir <dir>     - directory for language-specific depots when -languages-only is used.");
             Console.WriteLine("  -lowviolence             - download low violence depots when -app is used.");
             Console.WriteLine();
             Console.WriteLine("  -ugc <#>                 - the UGC ID to download.");

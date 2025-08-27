@@ -47,12 +47,21 @@ namespace DepotDownloader
             public byte[] DepotKey { get; } = depotKey;
         }
 
-        static bool CreateDirectories(uint depotId, uint depotVersion, out string installDir)
+        static bool CreateDirectories(uint depotId, uint depotVersion, out string installDir, string overrideDir = null)
         {
             installDir = null;
             try
             {
-                if (string.IsNullOrWhiteSpace(Config.InstallDirectory))
+                if (!string.IsNullOrWhiteSpace(overrideDir))
+                {
+                    Directory.CreateDirectory(overrideDir);
+
+                    installDir = overrideDir;
+
+                    Directory.CreateDirectory(Path.Combine(installDir, CONFIG_DIR));
+                    Directory.CreateDirectory(Path.Combine(installDir, STAGING_DIR));
+                }
+                else if (string.IsNullOrWhiteSpace(Config.InstallDirectory))
                 {
                     Directory.CreateDirectory(DEFAULT_DOWNLOAD_DIR);
 
@@ -442,6 +451,12 @@ namespace DepotDownloader
             var hasSpecificDepots = depotManifestIds.Count > 0;
             var depotIdsFound = new List<uint>();
             var depotIdsExpected = depotManifestIds.Select(x => x.depotId).ToList();
+            var depotLanguages = new Dictionary<uint, string>();
+            if (Config.DownloadLanguagesOnly)
+            {
+                hasSpecificDepots = false;
+                depotManifestIds.Clear();
+            }
             var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
 
             if (isUgc)
@@ -478,6 +493,10 @@ namespace DepotDownloader
                             var depotConfig = depotSection["config"];
                             if (depotConfig != KeyValue.Invalid)
                             {
+                                var depotLang = depotConfig["language"] != KeyValue.Invalid && !string.IsNullOrWhiteSpace(depotConfig["language"].Value)
+                                    ? depotConfig["language"].Value
+                                    : null;
+
                                 if (!Config.DownloadAllPlatforms &&
                                     depotConfig["oslist"] != KeyValue.Invalid &&
                                     !string.IsNullOrWhiteSpace(depotConfig["oslist"].Value))
@@ -496,11 +515,14 @@ namespace DepotDownloader
                                         continue;
                                 }
 
-                                if (!Config.DownloadAllLanguages &&
-                                    depotConfig["language"] != KeyValue.Invalid &&
-                                    !string.IsNullOrWhiteSpace(depotConfig["language"].Value))
+                                if (Config.DownloadLanguagesOnly)
                                 {
-                                    var depotLang = depotConfig["language"].Value;
+                                    if (string.IsNullOrEmpty(depotLang))
+                                        continue;
+                                    depotLanguages[id] = depotLang;
+                                }
+                                else if (!Config.DownloadAllLanguages && depotLang != null)
+                                {
                                     if (depotLang != (language ?? "english"))
                                         continue;
                                 }
@@ -535,7 +557,13 @@ namespace DepotDownloader
 
             foreach (var (depotId, manifestId) in depotManifestIds)
             {
-                var info = await GetDepotInfo(depotId, appId, manifestId, branch);
+                string baseDir = null;
+                if (Config.DownloadLanguagesOnly && depotLanguages.TryGetValue(depotId, out var depotLang))
+                {
+                    baseDir = Path.Combine(Config.LanguagesInstallDirectory, depotLang);
+                }
+
+                var info = await GetDepotInfo(depotId, appId, manifestId, branch, baseDir);
                 if (info != null)
                 {
                     infos.Add(info);
@@ -555,7 +583,7 @@ namespace DepotDownloader
             }
         }
 
-        static async Task<DepotDownloadInfo> GetDepotInfo(uint depotId, uint appId, ulong manifestId, string branch)
+        static async Task<DepotDownloadInfo> GetDepotInfo(uint depotId, uint appId, ulong manifestId, string branch, string installBaseDir = null)
         {
             if (steam3 != null && appId != INVALID_APP_ID)
             {
@@ -595,7 +623,7 @@ namespace DepotDownloader
 
             var uVersion = GetSteam3AppBuildNumber(appId, branch);
 
-            if (!CreateDirectories(depotId, uVersion, out var installDir))
+            if (!CreateDirectories(depotId, uVersion, out var installDir, installBaseDir))
             {
                 Console.WriteLine("Error: Unable to create install directories!");
                 return null;

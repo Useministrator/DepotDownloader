@@ -94,6 +94,8 @@ Parameter               | Description
 `-all-archs`            | download all architecture-specific depots when `-app` is used.
 `-all-languages`        | download all language-specific depots when `-app` is used.
 `-language <lang>`      | the language for which to download the game (default: english)
+`-languages-only`       | download only language-specific depots.
+`-languages-dir <dir>`  | directory for language-specific depots when `-languages-only` is used.
 `-lowviolence`          | download low violence depots when `-app` is used.
 `-dir <installdir>`     | the directory in which to place downloaded files.
 `-filelist <file.txt>`  | the name of a local file that contains a list of files to download (from the manifest). prefix file path with `regex:` if you want to match with regex. each file path should be on their own line.
