@@ -94,6 +94,7 @@ Parameter               | Description
 `-all-archs`            | download all architecture-specific depots when `-app` is used.
 `-all-languages`        | download all language-specific depots when `-app` is used.
 `-language <lang>`      | the language for which to download the game (default: english)
+`-language-only`       | download only language-specific depots. Without `-language` all available languages are downloaded into subdirectories named after the language.
 `-lowviolence`          | download low violence depots when `-app` is used.
 `-dir <installdir>`     | the directory in which to place downloaded files.
 `-filelist <file.txt>`  | the name of a local file that contains a list of files to download (from the manifest). prefix file path with `regex:` if you want to match with regex. each file path should be on their own line.
@@ -102,6 +103,8 @@ Parameter               | Description
 `-cellid <#>`           | the overridden CellID of the content server to download from.
 `-max-downloads <#>`    | maximum number of chunks to download concurrently. (default: 8).
 `-use-lancache`         | forces downloads over the local network via a Lancache instance.
+
+When `-language-only` is specified, depots without a `language` key are ignored. If `-language` is omitted, all available language depots are downloaded into folders named after their language.
 
 #### Other
 
