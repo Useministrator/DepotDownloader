@@ -284,6 +284,21 @@ namespace DepotDownloader
                     return 1;
                 }
 
+                var missingLang = GetParameter<string>(args, "-missing-language");
+                switch (missingLang?.ToLowerInvariant())
+                {
+                    case "base":
+                        ContentDownloader.Config.MissingLanguageBehavior = MissingLanguageBehavior.FallbackToBase;
+                        break;
+                    case null:
+                    case "skip":
+                        ContentDownloader.Config.MissingLanguageBehavior = MissingLanguageBehavior.Skip;
+                        break;
+                    default:
+                        Console.WriteLine("Error: -missing-language must be 'base' or 'skip'.");
+                        return 1;
+                }
+
                 var lv = HasParameter(args, "-lowviolence");
 
                 var depotManifestIds = new List<(uint, ulong)>();

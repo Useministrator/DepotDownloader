@@ -461,6 +461,9 @@ namespace DepotDownloader
 
                 if (depots != null)
                 {
+                    bool hasLanguageDepots = false;
+                    bool hasMatchingLanguageDepot = false;
+
                     foreach (var depotSection in depots.Children)
                     {
                         var id = INVALID_DEPOT_ID;
@@ -500,9 +503,11 @@ namespace DepotDownloader
                                     depotConfig["language"] != KeyValue.Invalid &&
                                     !string.IsNullOrWhiteSpace(depotConfig["language"].Value))
                                 {
+                                    hasLanguageDepots = true;
                                     var depotLang = depotConfig["language"].Value;
                                     if (depotLang != (language ?? "english"))
                                         continue;
+                                    hasMatchingLanguageDepot = true;
                                 }
 
                                 if (!lv &&
@@ -516,6 +521,20 @@ namespace DepotDownloader
 
                         if (!hasSpecificDepots)
                             depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+                    }
+
+                    if (hasLanguageDepots && !hasMatchingLanguageDepot)
+                    {
+                        Console.WriteLine("No depots match requested language '{0}'.", language ?? "english");
+                        if (Config.MissingLanguageBehavior == MissingLanguageBehavior.FallbackToBase && depotManifestIds.Count > 0)
+                        {
+                            Console.WriteLine("Falling back to base depots.");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Skipping download.");
+                            return;
+                        }
                     }
                 }
 

@@ -6,6 +6,12 @@ using System.Text.RegularExpressions;
 
 namespace DepotDownloader
 {
+    enum MissingLanguageBehavior
+    {
+        Skip,
+        FallbackToBase,
+    }
+
     class DownloadConfig
     {
         public int CellID { get; set; }
@@ -32,5 +38,7 @@ namespace DepotDownloader
 
         public bool UseQrCode { get; set; }
         public bool SkipAppConfirmation { get; set; }
+
+        public MissingLanguageBehavior MissingLanguageBehavior { get; set; } = MissingLanguageBehavior.Skip;
     }
 }
