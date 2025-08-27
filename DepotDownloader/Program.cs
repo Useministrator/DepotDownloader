@@ -275,6 +275,8 @@ namespace DepotDownloader
                     return 1;
                 }
 
+                ContentDownloader.Config.LanguageDepotsOnly = HasParameter(args, "-language-only");
+
                 ContentDownloader.Config.DownloadAllLanguages = HasParameter(args, "-all-languages");
                 var language = GetParameter<string>(args, "-language");
 
@@ -282,6 +284,11 @@ namespace DepotDownloader
                 {
                     Console.WriteLine("Error: Cannot specify -language when -all-languages is specified.");
                     return 1;
+                }
+
+                if (ContentDownloader.Config.LanguageDepotsOnly && string.IsNullOrEmpty(language))
+                {
+                    ContentDownloader.Config.DownloadAllLanguages = true;
                 }
 
                 var lv = HasParameter(args, "-lowviolence");
@@ -507,6 +514,7 @@ namespace DepotDownloader
             Console.WriteLine("  -osarch <arch>           - the architecture for which to download the game (32 or 64, default: the host's architecture)");
             Console.WriteLine("  -all-languages           - download all language-specific depots when -app is used.");
             Console.WriteLine("  -language <lang>         - the language for which to download the game (default: english)");
+            Console.WriteLine("  -language-only           - download only language-specific depots. If -language is omitted, all languages are downloaded.");
             Console.WriteLine("  -lowviolence             - download low violence depots when -app is used.");
             Console.WriteLine();
             Console.WriteLine("  -ugc <#>                 - the UGC ID to download.");
