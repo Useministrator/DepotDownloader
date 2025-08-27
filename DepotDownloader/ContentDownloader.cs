@@ -496,7 +496,19 @@ namespace DepotDownloader
                                         continue;
                                 }
 
-                                if (!Config.DownloadAllLanguages &&
+                                if (Config.DownloadLanguagesOnly)
+                                {
+                                    if (depotConfig["language"] == KeyValue.Invalid || string.IsNullOrWhiteSpace(depotConfig["language"].Value))
+                                        continue;
+
+                                    if (!string.IsNullOrWhiteSpace(language))
+                                    {
+                                        var depotLang = depotConfig["language"].Value;
+                                        if (depotLang != language)
+                                            continue;
+                                    }
+                                }
+                                else if (!Config.DownloadAllLanguages &&
                                     depotConfig["language"] != KeyValue.Invalid &&
                                     !string.IsNullOrWhiteSpace(depotConfig["language"].Value))
                                 {

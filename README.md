@@ -93,6 +93,7 @@ Parameter               | Description
 `-osarch <arch>`        | the architecture for which to download the game (32 or 64, default: the host's architecture)
 `-all-archs`            | download all architecture-specific depots when `-app` is used.
 `-all-languages`        | download all language-specific depots when `-app` is used.
+`-languages-only`       | download only language-specific depots when `-app` is used.
 `-language <lang>`      | the language for which to download the game (default: english)
 `-lowviolence`          | download low violence depots when `-app` is used.
 `-dir <installdir>`     | the directory in which to place downloaded files.
@@ -102,6 +103,12 @@ Parameter               | Description
 `-cellid <#>`           | the overridden CellID of the content server to download from.
 `-max-downloads <#>`    | maximum number of chunks to download concurrently. (default: 8).
 `-use-lancache`         | forces downloads over the local network via a Lancache instance.
+
+To download only a single language depot, combine `-languages-only` with `-language`:
+
+```
+./DepotDownloader -app <id> -languages-only -language <lang>
+```
 
 #### Other
 
