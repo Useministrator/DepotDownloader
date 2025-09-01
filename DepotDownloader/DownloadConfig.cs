@@ -12,6 +12,8 @@ namespace DepotDownloader
         public bool DownloadAllPlatforms { get; set; }
         public bool DownloadAllArchs { get; set; }
         public bool DownloadAllLanguages { get; set; }
+        public bool LanguageDepotsOnly { get; set; }
+        public bool LanguageSetDiff { get; set; }
         public bool DownloadManifestOnly { get; set; }
         public string InstallDirectory { get; set; }
 
