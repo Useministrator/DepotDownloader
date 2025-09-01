@@ -275,7 +275,8 @@ namespace DepotDownloader
                     return 1;
                 }
 
-                ContentDownloader.Config.LanguageDepotsOnly = HasParameter(args, "-language-only");
+                ContentDownloader.Config.LanguageSetDiff = HasParameter(args, "-language-diff");
+                ContentDownloader.Config.LanguageDepotsOnly = HasParameter(args, "-language-only") || ContentDownloader.Config.LanguageSetDiff;
 
                 ContentDownloader.Config.DownloadAllLanguages = HasParameter(args, "-all-languages");
                 var language = GetParameter<string>(args, "-language");
@@ -515,6 +516,7 @@ namespace DepotDownloader
             Console.WriteLine("  -all-languages           - download all language-specific depots when -app is used.");
             Console.WriteLine("  -language <lang>         - the language for which to download the game (default: english)");
             Console.WriteLine("  -language-only           - download only language-specific depots. If -language is omitted, all languages are downloaded.");
+            Console.WriteLine("  -language-diff           - download language-specific depots not included in the base install.");
             Console.WriteLine("  -lowviolence             - download low violence depots when -app is used.");
             Console.WriteLine();
             Console.WriteLine("  -ugc <#>                 - the UGC ID to download.");

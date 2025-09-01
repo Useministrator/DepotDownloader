@@ -455,6 +455,8 @@ namespace DepotDownloader
             var depotIdsExpected = depotManifestIds.Select(x => x.depotId).ToList();
             var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
             var depotLanguages = new Dictionary<uint, string>();
+            var baseDepotIds = Config.LanguageSetDiff ? new HashSet<uint>() : null;
+            var candidateDepotLanguages = Config.LanguageSetDiff ? new Dictionary<uint, string>() : null
 
             if (isUgc)
             {
@@ -508,7 +510,24 @@ namespace DepotDownloader
                                         continue;
                                 }
 
-                                if (Config.LanguageDepotsOnly)
+                                if (Config.LanguageSetDiff)
+                                {
+                                    if (depotConfig["language"] == KeyValue.Invalid ||
+                                        string.IsNullOrWhiteSpace(depotConfig["language"].Value))
+                                    {
+                                        baseDepotIds.Add(id);
+                                        continue;
+                                    }
+
+                                    var depotLang = depotConfig["language"].Value;
+                                    if (!Config.DownloadAllLanguages &&
+                                        depotLang != (language ?? "english"))
+                                        continue;
+
+                                    candidateDepotLanguages[id] = depotLang;
+                                    continue;
+                                }
+                                else if (Config.LanguageDepotsOnly)
                                 {
                                     if (depotConfig["language"] == KeyValue.Invalid ||
                                         string.IsNullOrWhiteSpace(depotConfig["language"].Value))
@@ -537,16 +556,37 @@ namespace DepotDownloader
                             }
                         }
 
-                        depotIdsFound.Add(id);
+                        if (!Config.LanguageSetDiff)
+                        {
+                            depotIdsFound.Add(id);
 
-                        if (!hasSpecificDepots)
-                            depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+                            if (!hasSpecificDepots)
+                                depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+                        }
+                    }
+                }
+
+                if (Config.LanguageSetDiff && !hasSpecificDepots)
+                {
+                    foreach (var kvp in candidateDepotLanguages)
+                    {
+                        if (!baseDepotIds.Contains(kvp.Key))
+                        {
+                            depotIdsFound.Add(kvp.Key);
+                            depotManifestIds.Add((kvp.Key, INVALID_MANIFEST_ID));
+                            depotLanguages[kvp.Key] = kvp.Value;
+                        }
                     }
                 }
 
                 if (depotManifestIds.Count == 0 && !hasSpecificDepots)
                 {
-                    if (Config.LanguageDepotsOnly)
+                    if (Config.LanguageSetDiff)
+                    {
+                        Console.WriteLine("Warning: Couldn't find any depots matching the language-diff filter for app {0}", appId);
+                        return;
+                    }
+                    else if (Config.LanguageDepotsOnly)
                     {
                         Console.WriteLine("Warning: Couldn't find any depots matching the language-only filter for app {0}", appId);
                         return;
