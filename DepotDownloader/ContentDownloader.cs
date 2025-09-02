@@ -83,8 +83,11 @@ namespace DepotDownloader
                     installDir = baseDir;
                 }
 
-                Directory.CreateDirectory(Path.Combine(installDir, CONFIG_DIR));
-                Directory.CreateDirectory(Path.Combine(installDir, STAGING_DIR));
+                if (!Config.SkipDepotDownloaderDir)
+                {
+                    Directory.CreateDirectory(Path.Combine(installDir, CONFIG_DIR));
+                    Directory.CreateDirectory(Path.Combine(installDir, STAGING_DIR));
+                }
             }
             catch
             {
@@ -395,7 +398,9 @@ namespace DepotDownloader
                 return;
             }
 
-            var stagingDir = Path.Combine(installDir, STAGING_DIR);
+            var stagingDir = Config.SkipDepotDownloaderDir
+                ? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+                : Path.Combine(installDir, STAGING_DIR);
             var fileStagingPath = Path.Combine(stagingDir, fileName);
             var fileFinalPath = Path.Combine(installDir, fileName);
 
@@ -786,7 +791,13 @@ namespace DepotDownloader
 
             DepotManifest oldManifest = null;
             DepotManifest newManifest = null;
-            var configDir = Path.Combine(depot.InstallDir, CONFIG_DIR);
+            var configDir = Config.SkipDepotDownloaderDir
+                ? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+                : Path.Combine(depot.InstallDir, CONFIG_DIR);
+            if (Config.SkipDepotDownloaderDir)
+            {
+                Directory.CreateDirectory(configDir);
+            }
 
             var lastManifestId = INVALID_MANIFEST_ID;
             DepotConfigStore.Instance.InstalledManifestIDs.TryGetValue(depot.DepotId, out lastManifestId);
@@ -940,7 +951,9 @@ namespace DepotDownloader
                 return null;
             }
 
-            var stagingDir = Path.Combine(depot.InstallDir, STAGING_DIR);
+            var stagingDir = Config.SkipDepotDownloaderDir
+                ? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+                : Path.Combine(depot.InstallDir, STAGING_DIR);
 
             var filesAfterExclusions = newManifest.Files.AsParallel().Where(f => TestIsFileIncluded(f.FileName)).ToList();
             var allFileNames = new HashSet<string>(filesAfterExclusions.Count);

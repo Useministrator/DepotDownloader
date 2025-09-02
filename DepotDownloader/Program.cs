@@ -137,6 +137,7 @@ namespace DepotDownloader
             ContentDownloader.Config.InstallDirectory = GetParameter<string>(args, "-dir");
 
             ContentDownloader.Config.VerifyAll = HasParameter(args, "-verify-all") || HasParameter(args, "-verify_all") || HasParameter(args, "-validate");
+            ContentDownloader.Config.SkipDepotDownloaderDir = HasParameter(args, "-skip-depotdownloader-dir");
 
             if (HasParameter(args, "-use-lancache"))
             {
@@ -530,6 +531,7 @@ namespace DepotDownloader
             Console.WriteLine("  -no-mobile               - prefer entering a 2FA code instead of prompting to accept in the Steam mobile app");
             Console.WriteLine();
             Console.WriteLine("  -dir <installdir>        - the directory in which to place downloaded files.");
+            Console.WriteLine("  -skip-depotdownloader-dir - do not create .DepotDownloader directories in the install folder.");
             Console.WriteLine("  -filelist <file.txt>     - the name of a local file that contains a list of files to download (from the manifest).");
             Console.WriteLine("                             prefix file path with `regex:` if you want to match with regex. each file path should be on their own line.");
             Console.WriteLine();
