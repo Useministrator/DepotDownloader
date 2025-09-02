@@ -461,7 +461,7 @@ namespace DepotDownloader
             var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
             var depotLanguages = new Dictionary<uint, string>();
             var baseDepotIds = Config.LanguageSetDiff ? new HashSet<uint>() : null;
-            var candidateDepotLanguages = Config.LanguageSetDiff ? new Dictionary<uint, string>() : null
+            var candidateDepotLanguages = Config.LanguageSetDiff ? new Dictionary<uint, string>() : null;
 
             if (isUgc)
             {
