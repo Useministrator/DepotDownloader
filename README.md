@@ -1,7 +1,7 @@
 DepotDownloader
 ===============
 
-Steam depot downloader utilizing the SteamKit2 library. Supports .NET 8.0
+Steam depot downloader utilizing the SteamKit2 library. Supports .NET 9.0
 
 This program must be run from a console, it has no GUI.
 
