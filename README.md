@@ -98,6 +98,7 @@ Parameter               | Description
 `-language-diff`       | download language-specific depots that are not part of the base install.
 `-lowviolence`          | download low violence depots when `-app` is used.
 `-dir <installdir>`     | the directory in which to place downloaded files.
+`-skip-depotdownloader-dir` | do not create temporary `.DepotDownloader` directories in the install folder.
 `-filelist <file.txt>`  | the name of a local file that contains a list of files to download (from the manifest). prefix file path with `regex:` if you want to match with regex. each file path should be on their own line.
 `-validate`             | include checksum verification of files already downloaded.
 `-manifest-only`        | downloads a human readable manifest for any depots that would be downloaded.

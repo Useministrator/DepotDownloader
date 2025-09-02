@@ -34,5 +34,6 @@ namespace DepotDownloader
 
         public bool UseQrCode { get; set; }
         public bool SkipAppConfirmation { get; set; }
+        public bool SkipDepotDownloaderDir { get; set; }
     }
 }
