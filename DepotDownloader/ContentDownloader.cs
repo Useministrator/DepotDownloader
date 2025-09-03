@@ -421,6 +421,17 @@ namespace DepotDownloader
             }
 
             File.Move(fileStagingPath, fileFinalPath);
+
+            if (Config.SkipDepotDownloaderDir)
+            {
+                try
+                {
+                    Directory.Delete(stagingDir, true);
+                }
+                catch
+                {
+                }
+            }
         }
 
         public static async Task DownloadAppAsync(uint appId, List<(uint depotId, ulong manifestId)> depotManifestIds, string branch, string os, string arch, string language, bool lv, bool isUgc)
@@ -442,7 +453,9 @@ namespace DepotDownloader
             Directory.CreateDirectory(Path.Combine(configPath, CONFIG_DIR));
             DepotConfigStore.LoadFromFile(Path.Combine(configPath, CONFIG_DIR, "depot.config"));
 
-            await steam3?.RequestAppInfo(appId);
+            try
+            {
+                await steam3?.RequestAppInfo(appId);
 
             if (!await AccountHasAccess(appId, appId))
             {
@@ -636,9 +649,23 @@ namespace DepotDownloader
                 throw;
             }
         }
+    finally
+    {
+        if (Config.SkipDepotDownloaderDir)
+        {
+            try
+            {
+                Directory.Delete(configPath, true);
+            }
+            catch
+            {
+            }
+            }
+        }
+        }
 
         static async Task<DepotDownloadInfo> GetDepotInfo(uint depotId, uint appId, ulong manifestId, string branch, string language)
-        {
+    {
             if (steam3 != null && appId != INVALID_APP_ID)
             {
                 await steam3.RequestAppInfo(appId);
@@ -780,6 +807,17 @@ namespace DepotDownloader
             foreach (var depotFileData in depotsToDownload)
             {
                 await DownloadSteam3AsyncDepotFiles(cts, downloadCounter, depotFileData, allFileNamesAllDepots);
+
+                if (Config.SkipDepotDownloaderDir)
+                {
+                    try
+                    {
+                        Directory.Delete(depotFileData.stagingDir, true);
+                    }
+                    catch
+                    {
+                    }
+                }
             }
 
             Ansi.Progress(Ansi.ProgressState.Hidden);
@@ -803,7 +841,8 @@ namespace DepotDownloader
             {
                 Directory.CreateDirectory(configDir);
             }
-
+            try
+            {
             var lastManifestId = INVALID_MANIFEST_ID;
             DepotConfigStore.Instance.InstalledManifestIDs.TryGetValue(depot.DepotId, out lastManifestId);
 
@@ -997,6 +1036,20 @@ namespace DepotDownloader
                 filteredFiles = filesAfterExclusions,
                 allFileNames = allFileNames
             };
+            }
+            finally
+            {
+                if (Config.SkipDepotDownloaderDir)
+                {
+                    try
+                    {
+                        Directory.Delete(configDir, true);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
 
         private static async Task DownloadSteam3AsyncDepotFiles(CancellationTokenSource cts,
