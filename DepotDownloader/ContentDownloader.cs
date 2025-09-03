@@ -434,6 +434,11 @@ namespace DepotDownloader
                 configPath = DEFAULT_DOWNLOAD_DIR;
             }
 
+            if (Config.SkipDepotDownloaderDir)
+            {
+                configPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            }
+
             Directory.CreateDirectory(Path.Combine(configPath, CONFIG_DIR));
             DepotConfigStore.LoadFromFile(Path.Combine(configPath, CONFIG_DIR, "depot.config"));
 
