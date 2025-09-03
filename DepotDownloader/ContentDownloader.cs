@@ -457,215 +457,215 @@ namespace DepotDownloader
             {
                 await steam3?.RequestAppInfo(appId);
 
-            if (!await AccountHasAccess(appId, appId))
-            {
-                if (steam3.steamUser.SteamID.AccountType != EAccountType.AnonUser && await steam3.RequestFreeAppLicense(appId))
+                if (!await AccountHasAccess(appId, appId))
                 {
-                    Console.WriteLine("Obtained FreeOnDemand license for app {0}", appId);
+                    if (steam3.steamUser.SteamID.AccountType != EAccountType.AnonUser && await steam3.RequestFreeAppLicense(appId))
+                    {
+                        Console.WriteLine("Obtained FreeOnDemand license for app {0}", appId);
 
-                    // Fetch app info again in case we didn't get it fully without a license.
-                    await steam3.RequestAppInfo(appId, true);
+                        // Fetch app info again in case we didn't get it fully without a license.
+                        await steam3.RequestAppInfo(appId, true);
+                    }
+                    else
+                    {
+                        var contentName = GetAppName(appId);
+                        throw new ContentDownloaderException(string.Format("App {0} ({1}) is not available from this account.", appId, contentName));
+                    }
+                }
+
+                var hasSpecificDepots = depotManifestIds.Count > 0;
+                var depotIdsFound = new List<uint>();
+                var depotIdsExpected = depotManifestIds.Select(x => x.depotId).ToList();
+                var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
+                var depotLanguages = new Dictionary<uint, string>();
+                var baseDepotIds = Config.LanguageSetDiff ? new HashSet<uint>() : null;
+                var candidateDepotLanguages = Config.LanguageSetDiff ? new Dictionary<uint, string>() : null;
+
+                if (isUgc)
+                {
+                    var workshopDepot = depots["workshopdepot"].AsUnsignedInteger();
+                    if (workshopDepot != 0 && !depotIdsExpected.Contains(workshopDepot))
+                    {
+                        depotIdsExpected.Add(workshopDepot);
+                        depotManifestIds = depotManifestIds.Select(pair => (workshopDepot, pair.manifestId)).ToList();
+                    }
+
+                    depotIdsFound.AddRange(depotIdsExpected);
                 }
                 else
                 {
-                    var contentName = GetAppName(appId);
-                    throw new ContentDownloaderException(string.Format("App {0} ({1}) is not available from this account.", appId, contentName));
-                }
-            }
+                    Console.WriteLine("Using app branch: '{0}'.", branch);
 
-            var hasSpecificDepots = depotManifestIds.Count > 0;
-            var depotIdsFound = new List<uint>();
-            var depotIdsExpected = depotManifestIds.Select(x => x.depotId).ToList();
-            var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
-            var depotLanguages = new Dictionary<uint, string>();
-            var baseDepotIds = Config.LanguageSetDiff ? new HashSet<uint>() : null;
-            var candidateDepotLanguages = Config.LanguageSetDiff ? new Dictionary<uint, string>() : null;
-
-            if (isUgc)
-            {
-                var workshopDepot = depots["workshopdepot"].AsUnsignedInteger();
-                if (workshopDepot != 0 && !depotIdsExpected.Contains(workshopDepot))
-                {
-                    depotIdsExpected.Add(workshopDepot);
-                    depotManifestIds = depotManifestIds.Select(pair => (workshopDepot, pair.manifestId)).ToList();
-                }
-
-                depotIdsFound.AddRange(depotIdsExpected);
-            }
-            else
-            {
-                Console.WriteLine("Using app branch: '{0}'.", branch);
-
-                if (depots != null)
-                {
-                    foreach (var depotSection in depots.Children)
+                    if (depots != null)
                     {
-                        var id = INVALID_DEPOT_ID;
-                        if (depotSection.Children.Count == 0)
-                            continue;
-
-                        if (!uint.TryParse(depotSection.Name, out id))
-                            continue;
-
-                        if (hasSpecificDepots && !depotIdsExpected.Contains(id))
-                            continue;
-
-                        if (!hasSpecificDepots)
+                        foreach (var depotSection in depots.Children)
                         {
-                            var depotConfig = depotSection["config"];
-                            if (depotConfig != KeyValue.Invalid)
-                            {
-                                if (!Config.DownloadAllPlatforms &&
-                                    depotConfig["oslist"] != KeyValue.Invalid &&
-                                    !string.IsNullOrWhiteSpace(depotConfig["oslist"].Value))
-                                {
-                                    var oslist = depotConfig["oslist"].Value.Split(',');
-                                    if (Array.IndexOf(oslist, os ?? Util.GetSteamOS()) == -1)
-                                        continue;
-                                }
+                            var id = INVALID_DEPOT_ID;
+                            if (depotSection.Children.Count == 0)
+                                continue;
 
-                                if (!Config.DownloadAllArchs &&
-                                    depotConfig["osarch"] != KeyValue.Invalid &&
-                                    !string.IsNullOrWhiteSpace(depotConfig["osarch"].Value))
-                                {
-                                    var depotArch = depotConfig["osarch"].Value;
-                                    if (depotArch != (arch ?? Util.GetSteamArch()))
-                                        continue;
-                                }
+                            if (!uint.TryParse(depotSection.Name, out id))
+                                continue;
 
-                                if (Config.LanguageSetDiff)
-                                {
-                                    if (depotConfig["language"] == KeyValue.Invalid ||
-                                        string.IsNullOrWhiteSpace(depotConfig["language"].Value))
-                                    {
-                                        baseDepotIds.Add(id);
-                                        continue;
-                                    }
-
-                                    var depotLang = depotConfig["language"].Value;
-                                    if (!Config.DownloadAllLanguages &&
-                                        depotLang != (language ?? "english"))
-                                        continue;
-
-                                    candidateDepotLanguages[id] = depotLang;
-                                    continue;
-                                }
-                                else if (Config.LanguageDepotsOnly)
-                                {
-                                    if (depotConfig["language"] == KeyValue.Invalid ||
-                                        string.IsNullOrWhiteSpace(depotConfig["language"].Value))
-                                        continue;
-
-                                    var depotLang = depotConfig["language"].Value;
-                                    if (!Config.DownloadAllLanguages &&
-                                        depotLang != (language ?? "english"))
-                                        continue;
-
-                                    depotLanguages[id] = depotLang;
-                                }
-                                else if (!Config.DownloadAllLanguages &&
-                                    depotConfig["language"] != KeyValue.Invalid &&
-                                    !string.IsNullOrWhiteSpace(depotConfig["language"].Value))
-                                {
-                                    var depotLang = depotConfig["language"].Value;
-                                    if (depotLang != (language ?? "english"))
-                                        continue;
-                                }
-
-                                if (!lv &&
-                                    depotConfig["lowviolence"] != KeyValue.Invalid &&
-                                    depotConfig["lowviolence"].AsBoolean())
-                                    continue;
-                            }
-                        }
-
-                        if (!Config.LanguageSetDiff)
-                        {
-                            depotIdsFound.Add(id);
+                            if (hasSpecificDepots && !depotIdsExpected.Contains(id))
+                                continue;
 
                             if (!hasSpecificDepots)
-                                depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+                            {
+                                var depotConfig = depotSection["config"];
+                                if (depotConfig != KeyValue.Invalid)
+                                {
+                                    if (!Config.DownloadAllPlatforms &&
+                                        depotConfig["oslist"] != KeyValue.Invalid &&
+                                        !string.IsNullOrWhiteSpace(depotConfig["oslist"].Value))
+                                    {
+                                        var oslist = depotConfig["oslist"].Value.Split(',');
+                                        if (Array.IndexOf(oslist, os ?? Util.GetSteamOS()) == -1)
+                                            continue;
+                                    }
+
+                                    if (!Config.DownloadAllArchs &&
+                                        depotConfig["osarch"] != KeyValue.Invalid &&
+                                        !string.IsNullOrWhiteSpace(depotConfig["osarch"].Value))
+                                    {
+                                        var depotArch = depotConfig["osarch"].Value;
+                                        if (depotArch != (arch ?? Util.GetSteamArch()))
+                                            continue;
+                                    }
+
+                                    if (Config.LanguageSetDiff)
+                                    {
+                                        if (depotConfig["language"] == KeyValue.Invalid ||
+                                            string.IsNullOrWhiteSpace(depotConfig["language"].Value))
+                                        {
+                                            baseDepotIds.Add(id);
+                                            continue;
+                                        }
+
+                                        var depotLang = depotConfig["language"].Value;
+                                        if (!Config.DownloadAllLanguages &&
+                                            depotLang != (language ?? "english"))
+                                            continue;
+
+                                        candidateDepotLanguages[id] = depotLang;
+                                        continue;
+                                    }
+                                    else if (Config.LanguageDepotsOnly)
+                                    {
+                                        if (depotConfig["language"] == KeyValue.Invalid ||
+                                            string.IsNullOrWhiteSpace(depotConfig["language"].Value))
+                                            continue;
+
+                                        var depotLang = depotConfig["language"].Value;
+                                        if (!Config.DownloadAllLanguages &&
+                                            depotLang != (language ?? "english"))
+                                            continue;
+
+                                        depotLanguages[id] = depotLang;
+                                    }
+                                    else if (!Config.DownloadAllLanguages &&
+                                        depotConfig["language"] != KeyValue.Invalid &&
+                                        !string.IsNullOrWhiteSpace(depotConfig["language"].Value))
+                                    {
+                                        var depotLang = depotConfig["language"].Value;
+                                        if (depotLang != (language ?? "english"))
+                                            continue;
+                                    }
+
+                                    if (!lv &&
+                                        depotConfig["lowviolence"] != KeyValue.Invalid &&
+                                        depotConfig["lowviolence"].AsBoolean())
+                                        continue;
+                                }
+                            }
+
+                            if (!Config.LanguageSetDiff)
+                            {
+                                depotIdsFound.Add(id);
+
+                                if (!hasSpecificDepots)
+                                    depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+                            }
                         }
                     }
-                }
 
-                if (Config.LanguageSetDiff && !hasSpecificDepots)
-                {
-                    foreach (var kvp in candidateDepotLanguages)
+                    if (Config.LanguageSetDiff && !hasSpecificDepots)
                     {
-                        if (!baseDepotIds.Contains(kvp.Key))
+                        foreach (var kvp in candidateDepotLanguages)
                         {
-                            depotIdsFound.Add(kvp.Key);
-                            depotManifestIds.Add((kvp.Key, INVALID_MANIFEST_ID));
-                            depotLanguages[kvp.Key] = kvp.Value;
+                            if (!baseDepotIds.Contains(kvp.Key))
+                            {
+                                depotIdsFound.Add(kvp.Key);
+                                depotManifestIds.Add((kvp.Key, INVALID_MANIFEST_ID));
+                                depotLanguages[kvp.Key] = kvp.Value;
+                            }
                         }
                     }
-                }
 
-                if (depotManifestIds.Count == 0 && !hasSpecificDepots)
-                {
-                    if (Config.LanguageSetDiff)
+                    if (depotManifestIds.Count == 0 && !hasSpecificDepots)
                     {
-                        Console.WriteLine("Warning: Couldn't find any depots matching the language-diff filter for app {0}", appId);
-                        return;
+                        if (Config.LanguageSetDiff)
+                        {
+                            Console.WriteLine("Warning: Couldn't find any depots matching the language-diff filter for app {0}", appId);
+                            return;
+                        }
+                        else if (Config.LanguageDepotsOnly)
+                        {
+                            Console.WriteLine("Warning: Couldn't find any depots matching the language-only filter for app {0}", appId);
+                            return;
+                        }
+
+                        throw new ContentDownloaderException(string.Format("Couldn't find any depots to download for app {0}", appId));
                     }
-                    else if (Config.LanguageDepotsOnly)
+
+                    if (depotIdsFound.Count < depotIdsExpected.Count)
                     {
-                        Console.WriteLine("Warning: Couldn't find any depots matching the language-only filter for app {0}", appId);
-                        return;
+                        var remainingDepotIds = depotIdsExpected.Except(depotIdsFound);
+                        throw new ContentDownloaderException(string.Format("Depot {0} not listed for app {1}", string.Join(", ", remainingDepotIds), appId));
                     }
-
-                    throw new ContentDownloaderException(string.Format("Couldn't find any depots to download for app {0}", appId));
                 }
 
-                if (depotIdsFound.Count < depotIdsExpected.Count)
+                var infos = new List<DepotDownloadInfo>();
+
+                foreach (var (depotId, manifestId) in depotManifestIds)
                 {
-                    var remainingDepotIds = depotIdsExpected.Except(depotIdsFound);
-                    throw new ContentDownloaderException(string.Format("Depot {0} not listed for app {1}", string.Join(", ", remainingDepotIds), appId));
+                    depotLanguages.TryGetValue(depotId, out var depotLang);
+                    var info = await GetDepotInfo(depotId, appId, manifestId, branch, depotLang);
+                    if (info != null)
+                    {
+                        infos.Add(info);
+                    }
                 }
-            }
 
-            var infos = new List<DepotDownloadInfo>();
+                Console.WriteLine();
 
-            foreach (var (depotId, manifestId) in depotManifestIds)
-            {
-                depotLanguages.TryGetValue(depotId, out var depotLang);
-                var info = await GetDepotInfo(depotId, appId, manifestId, branch, depotLang);
-                if (info != null)
+                try
                 {
-                    infos.Add(info);
+                    await DownloadSteam3Async(infos).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("App {0} was not completely downloaded.", appId);
+                    throw;
                 }
             }
-
-            Console.WriteLine();
-
-            try
+            finally
             {
-                await DownloadSteam3Async(infos).ConfigureAwait(false);
+                if (Config.SkipDepotDownloaderDir)
+                {
+                    try
+                    {
+                        Directory.Delete(configPath, true);
+                    }
+                    catch
+                    {
+                    }
+                }
             }
-            catch (OperationCanceledException)
-            {
-                Console.WriteLine("App {0} was not completely downloaded.", appId);
-                throw;
-            }
-        }
-    finally
-    {
-        if (Config.SkipDepotDownloaderDir)
-        {
-            try
-            {
-                Directory.Delete(configPath, true);
-            }
-            catch
-            {
-            }
-            }
-        }
         }
 
         static async Task<DepotDownloadInfo> GetDepotInfo(uint depotId, uint appId, ulong manifestId, string branch, string language)
-    {
+        {
             if (steam3 != null && appId != INVALID_APP_ID)
             {
                 await steam3.RequestAppInfo(appId);
@@ -843,199 +843,199 @@ namespace DepotDownloader
             }
             try
             {
-            var lastManifestId = INVALID_MANIFEST_ID;
-            DepotConfigStore.Instance.InstalledManifestIDs.TryGetValue(depot.DepotId, out lastManifestId);
+                var lastManifestId = INVALID_MANIFEST_ID;
+                DepotConfigStore.Instance.InstalledManifestIDs.TryGetValue(depot.DepotId, out lastManifestId);
 
-            // In case we have an early exit, this will force equiv of verifyall next run.
-            DepotConfigStore.Instance.InstalledManifestIDs[depot.DepotId] = INVALID_MANIFEST_ID;
-            DepotConfigStore.Save();
+                // In case we have an early exit, this will force equiv of verifyall next run.
+                DepotConfigStore.Instance.InstalledManifestIDs[depot.DepotId] = INVALID_MANIFEST_ID;
+                DepotConfigStore.Save();
 
-            if (lastManifestId != INVALID_MANIFEST_ID)
-            {
-                // We only have to show this warning if the old manifest ID was different
-                var badHashWarning = (lastManifestId != depot.ManifestId);
-                oldManifest = Util.LoadManifestFromFile(configDir, depot.DepotId, lastManifestId, badHashWarning);
-            }
-
-            if (lastManifestId == depot.ManifestId && oldManifest != null)
-            {
-                newManifest = oldManifest;
-                Console.WriteLine("Already have manifest {0} for depot {1}.", depot.ManifestId, depot.DepotId);
-            }
-            else
-            {
-                newManifest = Util.LoadManifestFromFile(configDir, depot.DepotId, depot.ManifestId, true);
-
-                if (newManifest != null)
+                if (lastManifestId != INVALID_MANIFEST_ID)
                 {
+                    // We only have to show this warning if the old manifest ID was different
+                    var badHashWarning = (lastManifestId != depot.ManifestId);
+                    oldManifest = Util.LoadManifestFromFile(configDir, depot.DepotId, lastManifestId, badHashWarning);
+                }
+
+                if (lastManifestId == depot.ManifestId && oldManifest != null)
+                {
+                    newManifest = oldManifest;
                     Console.WriteLine("Already have manifest {0} for depot {1}.", depot.ManifestId, depot.DepotId);
                 }
                 else
                 {
-                    Console.WriteLine($"Downloading depot {depot.DepotId} manifest");
+                    newManifest = Util.LoadManifestFromFile(configDir, depot.DepotId, depot.ManifestId, true);
 
-                    ulong manifestRequestCode = 0;
-                    var manifestRequestCodeExpiration = DateTime.MinValue;
-
-                    do
+                    if (newManifest != null)
                     {
-                        cts.Token.ThrowIfCancellationRequested();
+                        Console.WriteLine("Already have manifest {0} for depot {1}.", depot.ManifestId, depot.DepotId);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Downloading depot {depot.DepotId} manifest");
 
-                        Server connection = null;
+                        ulong manifestRequestCode = 0;
+                        var manifestRequestCodeExpiration = DateTime.MinValue;
 
-                        try
+                        do
                         {
-                            connection = cdnPool.GetConnection();
+                            cts.Token.ThrowIfCancellationRequested();
 
-                            string cdnToken = null;
-                            if (steam3.CDNAuthTokens.TryGetValue((depot.DepotId, connection.Host), out var authTokenCallbackPromise))
+                            Server connection = null;
+
+                            try
                             {
-                                var result = await authTokenCallbackPromise.Task;
-                                cdnToken = result.Token;
-                            }
+                                connection = cdnPool.GetConnection();
 
-                            var now = DateTime.Now;
-
-                            // In order to download this manifest, we need the current manifest request code
-                            // The manifest request code is only valid for a specific period in time
-                            if (manifestRequestCode == 0 || now >= manifestRequestCodeExpiration)
-                            {
-                                manifestRequestCode = await steam3.GetDepotManifestRequestCodeAsync(
-                                    depot.DepotId,
-                                    depot.AppId,
-                                    depot.ManifestId,
-                                    depot.Branch);
-                                // This code will hopefully be valid for one period following the issuing period
-                                manifestRequestCodeExpiration = now.Add(TimeSpan.FromMinutes(5));
-
-                                // If we could not get the manifest code, this is a fatal error
-                                if (manifestRequestCode == 0)
+                                string cdnToken = null;
+                                if (steam3.CDNAuthTokens.TryGetValue((depot.DepotId, connection.Host), out var authTokenCallbackPromise))
                                 {
-                                    cts.Cancel();
+                                    var result = await authTokenCallbackPromise.Task;
+                                    cdnToken = result.Token;
                                 }
-                            }
 
-                            DebugLog.WriteLine("ContentDownloader",
-                                "Downloading manifest {0} from {1} with {2}",
-                                depot.ManifestId,
-                                connection,
-                                cdnPool.ProxyServer != null ? cdnPool.ProxyServer : "no proxy");
-                            newManifest = await cdnPool.CDNClient.DownloadManifestAsync(
-                                depot.DepotId,
-                                depot.ManifestId,
-                                manifestRequestCode,
-                                connection,
-                                depot.DepotKey,
-                                cdnPool.ProxyServer,
-                                cdnToken).ConfigureAwait(false);
+                                var now = DateTime.Now;
 
-                            cdnPool.ReturnConnection(connection);
-                        }
-                        catch (TaskCanceledException)
-                        {
-                            Console.WriteLine("Connection timeout downloading depot manifest {0} {1}. Retrying.", depot.DepotId, depot.ManifestId);
-                        }
-                        catch (SteamKitWebRequestException e)
-                        {
-                            // If the CDN returned 403, attempt to get a cdn auth if we didn't yet
-                            if (e.StatusCode == HttpStatusCode.Forbidden && !steam3.CDNAuthTokens.ContainsKey((depot.DepotId, connection.Host)))
-                            {
-                                await steam3.RequestCDNAuthToken(depot.AppId, depot.DepotId, connection);
+                                // In order to download this manifest, we need the current manifest request code
+                                // The manifest request code is only valid for a specific period in time
+                                if (manifestRequestCode == 0 || now >= manifestRequestCodeExpiration)
+                                {
+                                    manifestRequestCode = await steam3.GetDepotManifestRequestCodeAsync(
+                                        depot.DepotId,
+                                        depot.AppId,
+                                        depot.ManifestId,
+                                        depot.Branch);
+                                    // This code will hopefully be valid for one period following the issuing period
+                                    manifestRequestCodeExpiration = now.Add(TimeSpan.FromMinutes(5));
+
+                                    // If we could not get the manifest code, this is a fatal error
+                                    if (manifestRequestCode == 0)
+                                    {
+                                        cts.Cancel();
+                                    }
+                                }
+
+                                DebugLog.WriteLine("ContentDownloader",
+                                    "Downloading manifest {0} from {1} with {2}",
+                                    depot.ManifestId,
+                                    connection,
+                                    cdnPool.ProxyServer != null ? cdnPool.ProxyServer : "no proxy");
+                                newManifest = await cdnPool.CDNClient.DownloadManifestAsync(
+                                    depot.DepotId,
+                                    depot.ManifestId,
+                                    manifestRequestCode,
+                                    connection,
+                                    depot.DepotKey,
+                                    cdnPool.ProxyServer,
+                                    cdnToken).ConfigureAwait(false);
 
                                 cdnPool.ReturnConnection(connection);
-
-                                continue;
                             }
-
-                            cdnPool.ReturnBrokenConnection(connection);
-
-                            if (e.StatusCode == HttpStatusCode.Unauthorized || e.StatusCode == HttpStatusCode.Forbidden)
+                            catch (TaskCanceledException)
                             {
-                                Console.WriteLine("Encountered {2} for depot manifest {0} {1}. Aborting.", depot.DepotId, depot.ManifestId, (int)e.StatusCode);
+                                Console.WriteLine("Connection timeout downloading depot manifest {0} {1}. Retrying.", depot.DepotId, depot.ManifestId);
+                            }
+                            catch (SteamKitWebRequestException e)
+                            {
+                                // If the CDN returned 403, attempt to get a cdn auth if we didn't yet
+                                if (e.StatusCode == HttpStatusCode.Forbidden && !steam3.CDNAuthTokens.ContainsKey((depot.DepotId, connection.Host)))
+                                {
+                                    await steam3.RequestCDNAuthToken(depot.AppId, depot.DepotId, connection);
+
+                                    cdnPool.ReturnConnection(connection);
+
+                                    continue;
+                                }
+
+                                cdnPool.ReturnBrokenConnection(connection);
+
+                                if (e.StatusCode == HttpStatusCode.Unauthorized || e.StatusCode == HttpStatusCode.Forbidden)
+                                {
+                                    Console.WriteLine("Encountered {2} for depot manifest {0} {1}. Aborting.", depot.DepotId, depot.ManifestId, (int)e.StatusCode);
+                                    break;
+                                }
+
+                                if (e.StatusCode == HttpStatusCode.NotFound)
+                                {
+                                    Console.WriteLine("Encountered 404 for depot manifest {0} {1}. Aborting.", depot.DepotId, depot.ManifestId);
+                                    break;
+                                }
+
+                                Console.WriteLine("Encountered error downloading depot manifest {0} {1}: {2}", depot.DepotId, depot.ManifestId, e.StatusCode);
+                            }
+                            catch (OperationCanceledException)
+                            {
                                 break;
                             }
-
-                            if (e.StatusCode == HttpStatusCode.NotFound)
+                            catch (Exception e)
                             {
-                                Console.WriteLine("Encountered 404 for depot manifest {0} {1}. Aborting.", depot.DepotId, depot.ManifestId);
-                                break;
+                                cdnPool.ReturnBrokenConnection(connection);
+                                Console.WriteLine("Encountered error downloading manifest for depot {0} {1}: {2}", depot.DepotId, depot.ManifestId, e.Message);
                             }
+                        } while (newManifest == null);
 
-                            Console.WriteLine("Encountered error downloading depot manifest {0} {1}: {2}", depot.DepotId, depot.ManifestId, e.StatusCode);
-                        }
-                        catch (OperationCanceledException)
+                        if (newManifest == null)
                         {
-                            break;
+                            Console.WriteLine("\nUnable to download manifest {0} for depot {1}", depot.ManifestId, depot.DepotId);
+                            cts.Cancel();
                         }
-                        catch (Exception e)
-                        {
-                            cdnPool.ReturnBrokenConnection(connection);
-                            Console.WriteLine("Encountered error downloading manifest for depot {0} {1}: {2}", depot.DepotId, depot.ManifestId, e.Message);
-                        }
-                    } while (newManifest == null);
 
-                    if (newManifest == null)
-                    {
-                        Console.WriteLine("\nUnable to download manifest {0} for depot {1}", depot.ManifestId, depot.DepotId);
-                        cts.Cancel();
+                        // Throw the cancellation exception if requested so that this task is marked failed
+                        cts.Token.ThrowIfCancellationRequested();
+
+                        Util.SaveManifestToFile(configDir, newManifest);
                     }
-
-                    // Throw the cancellation exception if requested so that this task is marked failed
-                    cts.Token.ThrowIfCancellationRequested();
-
-                    Util.SaveManifestToFile(configDir, newManifest);
                 }
-            }
 
-            Console.WriteLine("Manifest {0} ({1})", depot.ManifestId, newManifest.CreationTime);
+                Console.WriteLine("Manifest {0} ({1})", depot.ManifestId, newManifest.CreationTime);
 
-            if (Config.DownloadManifestOnly)
-            {
-                DumpManifestToTextFile(depot, newManifest);
-                return null;
-            }
-
-            var stagingDir = Config.SkipDepotDownloaderDir
-                ? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
-                : Path.Combine(depot.InstallDir, STAGING_DIR);
-
-            var filesAfterExclusions = newManifest.Files.AsParallel().Where(f => TestIsFileIncluded(f.FileName)).ToList();
-            var allFileNames = new HashSet<string>(filesAfterExclusions.Count);
-
-            // Pre-process
-            filesAfterExclusions.ForEach(file =>
-            {
-                allFileNames.Add(file.FileName);
-
-                var fileFinalPath = Path.Combine(depot.InstallDir, file.FileName);
-                var fileStagingPath = Path.Combine(stagingDir, file.FileName);
-
-                if (file.Flags.HasFlag(EDepotFileFlag.Directory))
+                if (Config.DownloadManifestOnly)
                 {
-                    Directory.CreateDirectory(fileFinalPath);
-                    Directory.CreateDirectory(fileStagingPath);
+                    DumpManifestToTextFile(depot, newManifest);
+                    return null;
                 }
-                else
+
+                var stagingDir = Config.SkipDepotDownloaderDir
+                    ? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+                    : Path.Combine(depot.InstallDir, STAGING_DIR);
+
+                var filesAfterExclusions = newManifest.Files.AsParallel().Where(f => TestIsFileIncluded(f.FileName)).ToList();
+                var allFileNames = new HashSet<string>(filesAfterExclusions.Count);
+
+                // Pre-process
+                filesAfterExclusions.ForEach(file =>
                 {
-                    // Some manifests don't explicitly include all necessary directories
-                    Directory.CreateDirectory(Path.GetDirectoryName(fileFinalPath));
-                    Directory.CreateDirectory(Path.GetDirectoryName(fileStagingPath));
+                    allFileNames.Add(file.FileName);
 
-                    downloadCounter.completeDownloadSize += file.TotalSize;
-                    depotCounter.completeDownloadSize += file.TotalSize;
-                }
-            });
+                    var fileFinalPath = Path.Combine(depot.InstallDir, file.FileName);
+                    var fileStagingPath = Path.Combine(stagingDir, file.FileName);
 
-            return new DepotFilesData
-            {
-                depotDownloadInfo = depot,
-                depotCounter = depotCounter,
-                stagingDir = stagingDir,
-                manifest = newManifest,
-                previousManifest = oldManifest,
-                filteredFiles = filesAfterExclusions,
-                allFileNames = allFileNames
-            };
+                    if (file.Flags.HasFlag(EDepotFileFlag.Directory))
+                    {
+                        Directory.CreateDirectory(fileFinalPath);
+                        Directory.CreateDirectory(fileStagingPath);
+                    }
+                    else
+                    {
+                        // Some manifests don't explicitly include all necessary directories
+                        Directory.CreateDirectory(Path.GetDirectoryName(fileFinalPath));
+                        Directory.CreateDirectory(Path.GetDirectoryName(fileStagingPath));
+
+                        downloadCounter.completeDownloadSize += file.TotalSize;
+                        depotCounter.completeDownloadSize += file.TotalSize;
+                    }
+                });
+
+                return new DepotFilesData
+                {
+                    depotDownloadInfo = depot,
+                    depotCounter = depotCounter,
+                    stagingDir = stagingDir,
+                    manifest = newManifest,
+                    previousManifest = oldManifest,
+                    filteredFiles = filesAfterExclusions,
+                    allFileNames = allFileNames
+                };
             }
             finally
             {
