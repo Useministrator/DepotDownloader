@@ -539,6 +539,11 @@ namespace DepotDownloader
                                             string.IsNullOrWhiteSpace(depotConfig["language"].Value))
                                         {
                                             baseDepotIds.Add(id);
+                                            depotIdsFound.Add(id);
+
+                                            if (!hasSpecificDepots)
+                                                depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+
                                             continue;
                                         }
 
@@ -793,11 +798,19 @@ namespace DepotDownloader
             // This is in last-depot-wins order, from Steam or the list of depots supplied by the user
             if (!string.IsNullOrWhiteSpace(Config.InstallDirectory) && depotsToDownload.Count > 0)
             {
-                var claimedFileNames = new HashSet<string>();
+                var claimedFileNamesByDir = new Dictionary<string, HashSet<string>>();
 
                 for (var i = depotsToDownload.Count - 1; i >= 0; i--)
                 {
-                    // For each depot, remove all files from the list that have been claimed by a later depot
+                    var installDir = depotsToDownload[i].depotDownloadInfo.InstallDir;
+
+                    if (!claimedFileNamesByDir.TryGetValue(installDir, out var claimedFileNames))
+                    {
+                        claimedFileNames = new HashSet<string>();
+                        claimedFileNamesByDir[installDir] = claimedFileNames;
+                    }
+
+                    // For each depot, remove all files from the list that have been claimed by a later depot in the same directory
                     depotsToDownload[i].filteredFiles.RemoveAll(file => claimedFileNames.Contains(file.FileName));
 
                     claimedFileNames.UnionWith(depotsToDownload[i].allFileNames);
