@@ -539,10 +539,11 @@ namespace DepotDownloader
                                             string.IsNullOrWhiteSpace(depotConfig["language"].Value))
                                         {
                                             baseDepotIds.Add(id);
-                                            depotIdsFound.Add(id);
 
-                                            if (!hasSpecificDepots)
-                                                depotManifestIds.Add((id, INVALID_MANIFEST_ID));
+                                            if (hasSpecificDepots && depotIdsExpected.Contains(id))
+                                            {
+                                                depotIdsFound.Add(id);
+                                            }
 
                                             continue;
                                         }
